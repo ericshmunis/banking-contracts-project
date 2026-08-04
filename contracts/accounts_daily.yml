@@ -1,0 +1,16 @@
+contract accounts_daily
+version: v1
+owner: data-team
+
+schema:
+  account_id:     string, not null, unique
+  customer_ssn:   string, not null       # PII field
+  customer_name:  string, not null
+  balance:        decimal(12,2)
+  account_type:   enum[checking, savings, loan]
+
+rules:
+  - balance >= 0
+  - customer_ssn is not null
+  - customer_ssn is unique
+  - account_id is unique
