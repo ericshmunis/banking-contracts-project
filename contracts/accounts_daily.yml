@@ -6,8 +6,8 @@ schema:
   account_id:     string, not null, unique
   customer_ssn:   string, not null       # PII field
   customer_name:  string, not null
-  balance:        decimal(12,2)
-  account_type:   enum[checking, savings, loan]
+  balance:        decimal(12,2), not null
+  account_type:   enum[checking, savings, loan], not null
 
 rules:
   - balance >= 0
