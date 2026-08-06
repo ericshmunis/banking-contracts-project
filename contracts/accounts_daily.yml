@@ -14,3 +14,10 @@ rules:
   - customer_ssn is not null
   - customer_ssn is unique
   - account_id is unique
+
+governance:
+  customer_ssn:
+    pii: true
+    masked_for: [default]
+    visible_to: [compliance_team]
+    masking_function: banking_contracts_demo.bronze.mask_ssn
