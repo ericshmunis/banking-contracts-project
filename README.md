@@ -52,6 +52,21 @@ runs automatically every hour via a scheduled Databricks Job.
   in-Databricks version in `01_generate_and_ingest`. Kept here for
   reference.
 
+## A note on what's in this repo vs. what's in Databricks
+
+The files in this repo are the code and contract definition. A few things
+that make the pipeline actually work are configured directly in the
+Databricks workspace and won't show up by browsing GitHub:
+
+- The Unity Catalog structure (the `banking_contracts_demo` catalog and its
+  schemas), and the `mask_ssn` masking function referenced in the contract's
+  governance section.
+- The `compliance_team` group used to control who sees unmasked SSN values.
+- The scheduled Databricks Job that runs the pipeline automatically every
+  hour.
+
+Happy to walk through any of this directly if it's useful.
+
 ## Status
 
 The core pipeline is done and running automatically. Right now it handles:
@@ -63,6 +78,34 @@ The core pipeline is done and running automatically. Right now it handles:
 - Unity Catalog PII masking for `customer_ssn`, tested and documented in the
   contract
 - An automated hourly Databricks Job orchestrating the full pipeline
+
+## Screenshots
+
+**Certificate chain.** Each certificate's `prev_cert_hash` matches the
+previous certificate's `data_hash`, forming a traceable, tamper-evident
+history across every batch that's been validated.
+
+![Certificate chain](screenshots/certificate_chain.png)
+
+**A caught failure.** One batch's full check breakdown, showing a null SSN
+correctly flagged while every other check passes.
+
+![Failed batch detail](screenshots/fail_detail.png)
+
+**PII masking, default view.** `customer_ssn` shown to a user who isn't in
+the `compliance_team` group.
+
+![Masked SSN view](screenshots/masked_view.png)
+
+**PII masking, authorized view.** Same rows, same query, but from a
+`compliance_team` member. SSNs are unmasked.
+
+![Unmasked SSN view](screenshots/unmasked_view.png)
+
+**Automated job history.** The pipeline running on its own hourly schedule,
+launched "By scheduler," not manually triggered.
+
+![Job run history](screenshots/job_runs.png)
 
 ## Possible next steps
 
