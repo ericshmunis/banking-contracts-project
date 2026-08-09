@@ -65,8 +65,6 @@ Databricks workspace and won't show up by browsing GitHub:
 - The scheduled Databricks Job that runs the pipeline automatically every
   hour.
 
-Happy to walk through any of this directly if it's useful.
-
 ## Status
 
 The core pipeline is done and running automatically. Right now it handles:
