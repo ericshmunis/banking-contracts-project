@@ -1,0 +1,111 @@
+name: Validate Data Contract (Databricks)
+
+# Runs the Databricks contract-validation job against every PR and reports
+# the result back as a required check.
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-contract:
+    runs-on: ubuntu-latest
+    # Overall safety net for the whole job (trigger + polling + overhead).
+    # Keep this comfortably above POLL_MAX_WAIT_SECONDS below.
+    timeout-minutes: 35
+
+    env:
+      DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+      DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+      DATABRICKS_JOB_ID: ${{ secrets.DATABRICKS_JOB_ID }}
+      # How long to sleep between poll attempts, in seconds.
+      POLL_INTERVAL_SECONDS: 20
+      # Hard cap on total polling time, in seconds, independent of the
+      # job-level timeout-minutes above. Belt-and-suspenders: if this trips
+      # first, we fail with a clear "polling timed out" message instead of
+      # relying solely on GitHub's own step/job timeout.
+      POLL_MAX_WAIT_SECONDS: 1800
+
+    steps:
+      - name: Trigger Databricks job run
+        id: trigger
+        run: |
+          response=$(curl -sS -X POST \
+            "${DATABRICKS_HOST}/api/2.1/jobs/run-now" \
+            -H "Authorization: Bearer ${DATABRICKS_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "{\"job_id\": ${DATABRICKS_JOB_ID}}")
+
+          echo "Trigger response: ${response}"
+
+          run_id=$(echo "${response}" | jq -r '.run_id // empty')
+          if [ -z "${run_id}" ]; then
+            echo "::error::Failed to get a run_id from run-now response."
+            exit 1
+          fi
+
+          echo "run_id=${run_id}" >> "$GITHUB_OUTPUT"
+          echo "Triggered Databricks run ${run_id}"
+
+      - name: Poll run status until finished
+        id: poll
+        run: |
+          run_id="${{ steps.trigger.outputs.run_id }}"
+          elapsed=0
+
+          # Databricks runs go through non-terminal life_cycle_states
+          # (PENDING, RUNNING, TERMINATING, ...) before landing on one of
+          # these terminal states. We poll runs/get on a fixed interval and
+          # only stop once life_cycle_state is one of these three.
+          is_terminal_state() {
+            case "$1" in
+              TERMINATED|SKIPPED|INTERNAL_ERROR) return 0 ;;
+              *) return 1 ;;
+            esac
+          }
+
+          while true; do
+            response=$(curl -sS -X GET \
+              "${DATABRICKS_HOST}/api/2.1/jobs/runs/get?run_id=${run_id}" \
+              -H "Authorization: Bearer ${DATABRICKS_TOKEN}")
+
+            life_cycle_state=$(echo "${response}" | jq -r '.state.life_cycle_state // empty')
+            result_state=$(echo "${response}" | jq -r '.state.result_state // empty')
+
+            echo "Elapsed ${elapsed}s: life_cycle_state=${life_cycle_state} result_state=${result_state}"
+
+            if [ -z "${life_cycle_state}" ]; then
+              echo "::error::Could not read life_cycle_state from runs/get response: ${response}"
+              exit 1
+            fi
+
+            if is_terminal_state "${life_cycle_state}"; then
+              echo "result_state=${result_state}" >> "$GITHUB_OUTPUT"
+              echo "life_cycle_state=${life_cycle_state}" >> "$GITHUB_OUTPUT"
+              break
+            fi
+
+            if [ "${elapsed}" -ge "${POLL_MAX_WAIT_SECONDS}" ]; then
+              echo "::error::Polling timed out after ${elapsed}s waiting for run ${run_id} to finish (last state: ${life_cycle_state})."
+              exit 1
+            fi
+
+            sleep "${POLL_INTERVAL_SECONDS}"
+            elapsed=$((elapsed + POLL_INTERVAL_SECONDS))
+          done
+
+      - name: Check validation result
+        run: |
+          life_cycle_state="${{ steps.poll.outputs.life_cycle_state }}"
+          result_state="${{ steps.poll.outputs.result_state }}"
+
+          # SKIPPED/INTERNAL_ERROR are terminal but never produce a
+          # result_state, so treat a missing result_state as a failure too.
+          if [ "${result_state}" = "SUCCESS" ]; then
+            echo "Databricks contract validation run succeeded."
+            exit 0
+          fi
+
+          echo "::error::Databricks contract validation failed (life_cycle_state=${life_cycle_state}, result_state=${result_state:-none})."
+          exit 1
