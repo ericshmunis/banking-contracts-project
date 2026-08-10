@@ -1,5 +1,7 @@
 # Banking Data Contract Enforcement Pipeline
 
+<!-- test-ci: verifying the validate-contract.yml workflow triggers on PRs -->
+
 A data contract enforcement pipeline for a banking scenario, built on
 **Databricks Free Edition**. I built this to actually understand the data
 contracts paradigm, Delta Lake, Unity Catalog, and PII governance, instead
