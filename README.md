@@ -40,6 +40,11 @@ separate from the validation pipeline's own logic.
 **Automation.** The full pipeline (generate, ingest, validate, certify)
 runs automatically every hour via a scheduled Databricks Job.
 
+**CI/CD.** A GitHub Actions workflow triggers the real Databricks pipeline
+on every pull request and polls it until it finishes. Branch protection on
+`master` requires this check to pass, so a pull request that would fail
+contract validation is blocked from merging.
+
 ## What's here
 
 - **`contracts/accounts_daily.yml`**: the data contract itself. Schema,
@@ -49,6 +54,9 @@ runs automatically every hour via a scheduled Databricks Job.
   the Bronze Delta table.
 - **`02_validate_contract`** (Databricks notebook): validates the latest
   batch against the contract and issues a hash-chained certificate.
+- **`.github/workflows/validate-contract.yml`**: the GitHub Actions
+  workflow that triggers the Databricks job on pull requests and gates
+  merging on its result.
 - **`generate_data.py`** and **`requirements.txt`**: the original local data
   generation scaffold from early on in the project, superseded by the
   in-Databricks version in `01_generate_and_ingest`. Kept here for
@@ -78,6 +86,8 @@ The core pipeline is done and running automatically. Right now it handles:
 - Unity Catalog PII masking for `customer_ssn`, tested and documented in the
   contract
 - An automated hourly Databricks Job orchestrating the full pipeline
+- GitHub Actions CI: pull requests trigger the real Databricks pipeline and
+  are blocked from merging if contract validation fails
 
 ## Screenshots
 
@@ -109,8 +119,6 @@ launched "By scheduler," not manually triggered.
 
 ## Possible next steps
 
-- CI/CD integration: run contract checks automatically through GitHub
-  Actions on pull requests.
 - Convert the validation logic to native Lakeflow Declarative Pipeline
   expectations.
 - Explicit schema enforcement at write time (right now it's validated
