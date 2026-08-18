@@ -119,10 +119,12 @@ launched "By scheduler," not manually triggered.
 
 ## Possible next steps
 
+- Real cryptographic signing of certificates (key-based, not just hash
+  chaining).
+- Benchmarking and access logs added to certificates (execution time per
+  check, access history).
 - Convert the validation logic to native Lakeflow Declarative Pipeline
   expectations.
-- Explicit schema enforcement at write time (right now it's validated
-  after ingestion, not enforced at the point of write).
 
 ## Note on data
 
